@@ -1,0 +1,13 @@
+<!doctype html>
+<html>
+    <body>
+        <script>
+            const newWindowUrl = new URL(
+                "real-page.html",
+                window.location.href,
+            );
+            window.open(newWindowUrl.href);
+            window.close();
+        </script>
+    </body>
+</html>

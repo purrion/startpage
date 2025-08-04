@@ -1,0 +1,15 @@
+/*
+    Data Structure:
+    categories: [
+        {
+            category: "category_name",
+            color: "color_name",
+            items: {
+                "title_1": "url_1",
+                "title_2": "url_2"
+            }
+        }
+    ]
+*/
+
+const categories = []

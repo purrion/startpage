@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>~</title>
+        <link rel="shortcut icon" type="image/png" href="favicon.png" />
+        <link rel="stylesheet" type="text/css" href="styles/main.css" />
+    </head>
+    <body>
+        <div id="main">
+            <input
+                id="search"
+                class="search"
+                type="text"
+                placeholder="Search... (press '/' to focus)"
+            />
+            <div id="categories"></div>
+        </div>
+
+        <script src="data.js">
+            // {import `categories` array}
+        </script>
+
+        <script>
+            function isFuzzyMatch(_text, _pattern) {
+                let textIndex = 0;
+                let patternIndex = 0;
+                const text = _text.toLowerCase();
+                const pattern = _pattern.toLowerCase();
+
+                while (
+                    textIndex < text.length &&
+                    patternIndex < pattern.length
+                ) {
+                    if (text[textIndex] === pattern[patternIndex])
+                        patternIndex++;
+                    textIndex++;
+                }
+                return patternIndex === pattern.length;
+            }
+
+            function matchesAllKeywords(text, search) {
+                const keywords = search.trim().toLowerCase().split(/\s+/);
+                return keywords.every((keyword) => isFuzzyMatch(text, keyword));
+            }
+
+            function highlightMatch(text, search) {
+                if (!search) return text;
+                const keywords = search.trim().toLowerCase().split(/\s+/);
+                const lowerText = text.toLowerCase();
+
+                let highlightMap = new Array(text.length).fill(false);
+                keywords.forEach((keyword) => {
+                    let textIndex = 0;
+                    let patternIndex = 0;
+                    while (
+                        textIndex < text.length &&
+                        patternIndex < keyword.length
+                    ) {
+                        if (lowerText[textIndex] === keyword[patternIndex]) {
+                            highlightMap[textIndex] = true;
+                            patternIndex++;
+                        }
+                        textIndex++;
+                    }
+                });
+                return [...text]
+                    .map((char, i) =>
+                        highlightMap[i]
+                            ? `<mark>${char}</mark>`
+                            : `<span class="faint">${char}</span>`,
+                    )
+                    .join("");
+            }
+        </script>
+
+        <script>
+            let allLinks = [];
+            const labelStrPool = "QWERTYUIOP";
+            let hintMode = false;
+            let hintBuffer = "";
+
+            const collapseMap = new Map();
+            categories.forEach((item) => {
+                collapseMap.set(item.category, true);
+            });
+
+            const $categories = document.getElementById("categories");
+            const $searchInput = document.getElementById("search");
+
+            const shouldCollapseCategory = (category, search) => {
+                if (search) return false;
+                return collapseMap.get(category);
+            };
+
+            function renderShortcuts() {
+                $categories.innerHTML = "";
+                allLinks = [];
+                let counter = 0; //shortcut counter
+                let catCounter = 0; //category counter
+                const search = $searchInput.value.toLowerCase();
+
+                categories.forEach(({ category, items, color }, index) => {
+                    const matchedItems = Object.entries(items).filter(
+                        ([name]) => matchesAllKeywords(name, search),
+                    );
+
+                    if (search && matchedItems.length === 0) return;
+
+                    const $category = document.createElement("div");
+                    $category.className = `category ${shouldCollapseCategory(category, search) && "collapsed"}`;
+                    $category.dataset.index =
+                        index < labelStrPool.length ? labelStrPool[index] : "";
+                    catCounter++;
+
+                    const $header = document.createElement("div");
+                    $header.className = "category-header";
+                    $header.style.background = `var(--${color})`;
+                    $header.innerHTML = `<div class="hint">${$category.dataset.index}</div><span>${category}</span>`;
+                    $header.onclick = (e) => {
+                        e.stopPropagation();
+                        $category.classList.toggle("collapsed");
+                        collapseMap.set(
+                            category,
+                            $category.classList.contains("collapsed"),
+                        );
+                    };
+                    $category.appendChild($header);
+
+                    const $links = document.createElement("div");
+                    $links.className = "links";
+
+                    matchedItems.forEach(([name, url]) => {
+                        const label = String(counter).padStart(2, "0");
+
+                        const $a = document.createElement("a");
+                        $a.href = url;
+                        $a.className = "link";
+                        $a.dataset.index = counter;
+                        $a.dataset.label = label;
+                        let renderedHint = "";
+                        for (let i = 0; i < label.length; i++) {
+                            if (
+                                i < hintBuffer.length &&
+                                label[i] === hintBuffer[i]
+                            ) {
+                                renderedHint += `<span class="faint">${label[i]}</span>`;
+                            } else {
+                                renderedHint += label[i];
+                            }
+                        }
+                        const shouldShowHint =
+                            hintMode &&
+                            (hintBuffer === "" ||
+                                (hintBuffer !== "" &&
+                                    label.startsWith(hintBuffer)));
+
+                        $a.innerHTML += `<div class="hint" style="display: ${
+                            shouldShowHint ? "block" : "none"
+                        }">${renderedHint}</div>`;
+                        $a.innerHTML += highlightMatch(name, search);
+                        $links.appendChild($a);
+                        allLinks.push($a);
+                        counter++;
+                    });
+
+                    $category.appendChild($links);
+                    $categories.appendChild($category);
+                });
+            }
+        </script>
+
+        <script>
+            renderShortcuts();
+            $searchInput.addEventListener("input", renderShortcuts);
+
+            document.addEventListener("keydown", (e) => {
+                const isSearching = document.activeElement === $searchInput;
+                if (isSearching) {
+                    if (e.key === "Escape") {
+                        $searchInput.blur();
+                    }
+                    return;
+                }
+
+                if (hintMode) {
+                    if (e.key === "f") {
+                        document.body.classList.remove("hint-mode");
+                        hintMode = false;
+                        renderShortcuts();
+                    }
+
+                    if (e.key === "Escape") {
+                        document.body.classList.remove("hint-mode");
+                        hintBuffer = "";
+                        hintMode = false;
+                        renderShortcuts();
+                    }
+
+                    if (labelStrPool.includes(e.key.toUpperCase())) {
+                        const $category = document.querySelector(
+                            `div.category[data-index="${e.key.toUpperCase()}"]`,
+                        );
+
+                        if ($category) {
+                            $category.classList.toggle("collapsed");
+                            const category = $category
+                                .querySelector(".category-header span")
+                                ?.textContent.trim();
+
+                            collapseMap.set(
+                                category,
+                                $category.classList.contains("collapsed"),
+                            );
+                        }
+                    }
+
+                    if (!isNaN(e.key)) {
+                        hintBuffer += e.key;
+
+                        renderShortcuts();
+                        if (hintBuffer.length === 2) {
+                            const link = allLinks.find(
+                                (a) => a.dataset.label === hintBuffer,
+                            );
+                            if (link) {
+                                window.location.href = link.href;
+                            }
+                            hintBuffer = ""; // reset after match or fail
+                            renderShortcuts();
+                        }
+                        return;
+                    }
+                    return;
+                }
+
+                if (e.key === "/") {
+                    e.preventDefault();
+                    $searchInput.focus();
+                    return;
+                }
+
+                if (e.key === "f") {
+                    document.body.classList.add("hint-mode");
+                    hintMode = true;
+                    renderShortcuts(); // reset hint visuals
+                    return;
+                }
+            });
+        </script>
+    </body>
+</html>
