@@ -17,10 +17,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create data.js for deployment
-        run: cp data.template.js data.js
+        run: |
+          cp data.template.js data.js
+          git add -f data.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
+          allow_empty_commit: false
+          exclude_assets: "" # disables default ignore
